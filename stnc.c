@@ -1,100 +1,144 @@
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <errno.h>
+#include "stnc.h"
+#include "part_a.c"
+#include "uds.c"
+#include "filename.c"
+#include "createFile.c"
+#define ipv4 1
+#define ipv6 2
+#define uds 3
+#define mmap 4
+#define pipe 5
 
-#define BUFFER_SIZE 1024
 
-void handle_client(int client_sock, int argc) {
-    char buffer[BUFFER_SIZE]; // meake buffer
-    ssize_t read_size;
+int p_flag = 1;
 
-    while ((read_size = recv(client_sock, buffer, BUFFER_SIZE, 0)) > 0) { //got the size of the buffer
-        buffer[read_size] = '\0';
-        if (argc==4)
-            printf("server: ");
-        else
+void ClassifiedCommunication(char *side, char *ip, int port, int type, char *param)
+{
+    if (p_flag)
+    {
+        printf("handle_%s_%d %d %s\n", side, type, type, param);
+    }
+    
+    if (strcmp(side, "c") == 0)
+    {
+        switch (type)
         {
-            printf("client: ");
+            case 1:
+                if (strcmp(param, "tcp") == 0)
+                {
+                    clientIpv4Tcp(ip, port);
+                }
+                else if (strcmp(param, "udp") == 0)
+                {
+                    clientIpv4Udp(ip, port);
+                }
+                break;
+                
+            case 2:
+                if (strcmp(param, "tcp") == 0)
+                {
+                    clientIpv6Tcp(ip, port);
+                }
+                else if (strcmp(param, "udp") == 0)
+                {
+                    clientIpv6Udp(ip, port);
+                }
+                break;
+                
+            case 3:
+                if (strcmp(param, "dgram") == 0)
+                {
+                    clientUdsDgram();
+                }
+                else if (strcmp(param, "stream") == 0)
+                {
+                    clientUdsStream();
+                }
+                break;
+                
+            case 4:
+                if (strcmp(param, "filename") == 0)
+                {
+                    clientMmapFilename();
+                }
+                break;
+                
+            case 5:
+                if (strcmp(param, "filename") == 0)
+                {
+                    clientPipeFilename();
+                }
+                break;
+                
+            default:
+                printf("Unknown option: %d %s\n", type, param);
+                break;
         }
-        printf("%s", buffer);
-        fflush(stdout);
-    }
-}
-
-int main(int argc, char *argv[]) { //to start the program in the terminal
-    if (argc < 3) {
-        printf("Usage:\n");
-        printf("  Client: stnc -c IP PORT\n");
-        printf("  Server: stnc -s PORT\n");
-        return 1;
-    }
-
-    int sock;
-    struct sockaddr_in addr;
-    bool is_client = strcmp(argv[1], "-c") == 0;
-
-    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        perror("socket");
-        return 1;
-    }
-
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(atoi(argv[is_client ? 3 : 2]));
-
-    if (is_client) {
-        addr.sin_addr.s_addr = inet_addr(argv[2]);
-        printf("client is ready: \n");
-        if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1) { //if the connect didnt sucsess
-            perror("connect");
-            return 1;
-        }
-    }
-    else {
-        addr.sin_addr.s_addr = INADDR_ANY;
-        printf("server is ready: \n");
-        if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1) { //if the bind between the port the ip didnt sucess
-            perror("bind");
-            return 1;
-        }
-        if (listen(sock, 1) == -1) {
-            perror("listen");
-            return 1;
-        }
-        sock = accept(sock, NULL, NULL); // start the accept function
-        printf("please enter exit to get out from the chat!");
-
-    }
-
-    if (fork() == 0) {
-        handle_client(sock,argc);
-
     }
     else
     {
-        char buffer[BUFFER_SIZE];
-        ssize_t read_size;
-
-        while ((read_size = read(STDIN_FILENO, buffer, BUFFER_SIZE)) > 0) {
-            buffer[read_size] = '\0'; // Ensure null termination for string comparison
-
-            // Check if the user typed "exit"
-            if (strcmp(buffer, "exit\n") == 0) {
-                printf("client leaves the chat...\n");
-                exit(0); // Exit the program
-            }
-
-            send(sock, buffer, read_size, 0);
+        switch (type)
+        {
+            case 1:
+                if (strcmp(param, "tcp") == 0)
+                {
+                    serverIpv4Tcp(port);
+                }
+                else if (strcmp(param, "udp") == 0)
+                {
+                    serverIpv4Udp(port);
+                }
+                break;
+                
+            case 2:
+                if (strcmp(param, "tcp") == 0)
+                {
+                    serverIpv6Tcp(port);
+                }
+                else if (strcmp(param, "udp") == 0)
+                {
+                    serverIpv6Udp(port);
+                }
+                break;
+                
+            case 3:
+                if (strcmp(param, "dgram") == 0)
+                {
+                    serverUdsDgram();
+                }
+                else if (strcmp(param, "stream") == 0)
+                {
+                    serverUdsStream();
+                }
+                break;
+                
+            case 4:
+                if (strcmp(param, "filename") == 0)
+                {
+                    serverMmapFilename();
+                }
+                break;
+                
+            case 5:
+                if (strcmp(param, "filename") == 0)
+                {
+                    serverPipeFilename();
+                }
+                break;
+                
+            default:
+                printf("Unknown option: %d %s\n", type, param);
+                break;
         }
-
-        shutdown(sock, SHUT_WR);
-
     }
-
-    return 0;
 }
